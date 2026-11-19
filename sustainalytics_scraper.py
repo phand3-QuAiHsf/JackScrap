@@ -130,6 +130,14 @@ def wait_visible(driver, by, value, timeout=WAIT_SECONDS):
 def wait_url_contains(driver, substr, timeout=WAIT_SECONDS):
     WebDriverWait(driver, timeout).until(EC.url_contains(substr))
 
+def _debug_dump(driver, label):
+    try:
+        driver.save_screenshot(f"debug_{label}.png")
+        with open(f"debug_{label}.html", "w", encoding="utf-8") as fh:
+            fh.write(driver.page_source)
+        print(f">>> Saved debug_{label}.png and debug_{label}.html")
+    except Exception as e:
+        print(f">>> Could not save debug dump ({label}): {e}")
 
 # ---------------------------------------------------------------------------
 # Login (automatic, using encrypted stored credentials)
@@ -216,6 +224,41 @@ def search_company(driver, ticker):
         driver.execute_script("arguments[0].click();", first_result)
 
     wait_url_contains(driver, "/overview")
+
+def open_risk_overview(driver):
+    long_wait = max(WAIT_SECONDS, 40)
+    link_xpath = "//*[contains(@class,'text-link') and contains(., 'ESG Risk Rating')]"
+    try:
+        link = WebDriverWait(driver, long_wait).until(
+            EC.presence_of_element_located((By.XPATH, link_xpath))
+        )
+    except TimeoutException:
+        _debug_dump(driver, "open_risk_overview_timeout")
+        raise
+
+    driver.execute_script(
+        "document.querySelectorAll('iframe[name*=survey], .QSISlider, .QSIWebResponsive, [class*=QSI]').forEach(e => e.remove());"
+        "arguments[0].scrollIntoView({block:'center'});",
+        link,
+    )
+    try:
+        WebDriverWait(driver, long_wait).until(
+            EC.element_to_be_clickable((By.XPATH, link_xpath))
+        )
+        link.click()
+    except (TimeoutException, ElementClickInterceptedException):
+        driver.execute_script("arguments[0].click();", link)
+
+    if len(driver.window_handles) > 1:
+        driver.switch_to.window(driver.window_handles[-1])
+
+    try:
+        wait_url_contains(driver, "/risk/overview")
+    except TimeoutException:
+        _debug_dump(driver, "open_risk_overview_url_timeout")
+        print(f">>> DEBUG: current URL is: {driver.current_url}")
+        raise
+
 
 # ---------------------------------------------------------------------------
 # Scraping the /risk/overview page
