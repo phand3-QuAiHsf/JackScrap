@@ -196,64 +196,19 @@ def search_company(driver, ticker):
     box.clear()
     box.send_keys(ticker)
 
-    # Wait for the dropdown result(s) to render, then click the first one.
+    # Wait for the dropdown result(s) to render
     first_result = WebDriverWait(driver, WAIT_SECONDS).until(
-        EC.element_to_be_clickable((By.CSS_SELECTOR, "search-result.list-group-item"))
+        EC.presence_of_element_located((By.CSS_SELECTOR, "search-result.list-group-item"))
     )
-    first_result.click()
+
+    # Remove any Qualtrics survey popup overlays if present, then click via JS
+    driver.execute_script(
+        "document.querySelectorAll('iframe[name*=\"survey\"], .QSISlider, .QSIWebResponsive').forEach(e => e.remove());"
+        "arguments[0].click();",
+        first_result,
+    )
     wait_url_contains(driver, "/overview")
 
-
-def open_risk_overview(driver):
-    # On the company "overview" page, click the "ESG Risk Rating" link.
-    # The real clickable element has class "text-link" (confirmed from the
-    # actual page HTML). Matching on that specific class avoids accidentally
-    # grabbing a non-clickable heading/label elsewhere on the page that also
-    # contains the words "ESG Risk Rating".
-    long_wait = max(WAIT_SECONDS, 40)
-    link_xpath = "//*[contains(@class,'text-link') and contains(., 'ESG Risk Rating')]"
-    try:
-        link = WebDriverWait(driver, long_wait).until(
-            EC.presence_of_element_located((By.XPATH, link_xpath))
-        )
-    except TimeoutException:
-        _debug_dump(driver, "open_risk_overview_timeout")
-        raise
-
-    # Scroll it into view and try a normal click; if something (e.g. the
-    # dismissible info banner) is overlapping it, fall back to a JS click.
-    driver.execute_script("arguments[0].scrollIntoView({block:'center'});", link)
-    try:
-        WebDriverWait(driver, long_wait).until(
-            EC.element_to_be_clickable((By.XPATH, link_xpath))
-        )
-        link.click()
-    except (TimeoutException, ElementClickInterceptedException):
-        driver.execute_script("arguments[0].click();", link)
-
-    # If the click opened a new tab/window, switch the driver to it before
-    # checking the URL.
-    if len(driver.window_handles) > 1:
-        driver.switch_to.window(driver.window_handles[-1])
-
-    try:
-        wait_url_contains(driver, "/risk/overview")
-    except TimeoutException:
-        _debug_dump(driver, "open_risk_overview_url_timeout")
-        print(f">>> DEBUG: current URL is: {driver.current_url}")
-        raise
-
-
-def _debug_dump(driver, label):
-    """On failure, save a screenshot + page source so we can see what the
-    browser actually rendered. Files land next to the script."""
-    try:
-        driver.save_screenshot(f"debug_{label}.png")
-        with open(f"debug_{label}.html", "w", encoding="utf-8") as f:
-            f.write(driver.page_source)
-        print(f">>> Saved debug_{label}.png / .html for inspection.")
-    except Exception as e:
-        print(f">>> Could not save debug info: {e}")
 
 
 # ---------------------------------------------------------------------------
