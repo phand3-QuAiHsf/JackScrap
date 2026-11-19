@@ -604,23 +604,20 @@ def main():
     parser.add_argument(
         "--workbook",
         default=str(Path(__file__).parent / "Risk Report - Hanley_Scraper.xlsx"),
-        help="Path to the Excel workbook (defaults to 'Risk Report - Hanley_Scraper.xlsx' next to this script)",
+        help="Path to the Excel workbook template",
     )
-    parser.add_argument("--ticker", help="Override: scrape this single ticker instead of reading R3")
-    parser.add_argument("--tickers", help="Comma-separated list of tickers to scrape one after another (prints results; does not auto-fill multiple rows)")
-    parser.add_argument("--output", help="Output xlsx path (defaults to <workbook>_scraped.xlsx)")
+    parser.add_argument("--ticker", help="Optional: pass a ticker directly via command line")
+    parser.add_argument("--output", help="Optional: custom output xlsx path")
     parser.add_argument("--manual-login", action="store_true",
                          help="Fall back to logging in by hand (use this if MFA blocks auto-login)")
     args = parser.parse_args()
 
-    output = args.output or args.workbook.replace(".xlsx", "_scraped.xlsx")
+    # Always prompt for ticker(s) if not passed via --ticker flag
+    raw_input = args.ticker or input("\nEnter company ticker(s) separated by commas (e.g., NVDA or ASML,COHR): ")
+    ticker_list = [t.strip().upper() for t in raw_input.split(",") if t.strip()]
 
-    if args.tickers:
-        ticker_list = [t.strip() for t in args.tickers.split(",") if t.strip()]
-    elif args.ticker:
-        ticker_list = [args.ticker]
-    else:
-        ticker_list = [read_ticker(args.workbook)]
+    if not ticker_list:
+        raise SystemExit("No ticker entered. Exiting.")
 
     driver = start_driver()
     try:
@@ -630,20 +627,14 @@ def main():
             username, password = load_credentials()
             auto_login(driver, username, password)
 
-        all_results = {}
         for ticker in ticker_list:
             print(f"\nScraping {ticker} ...")
             data = scrape_company(driver, ticker)
-            all_results[ticker] = data
             print(f"{ticker} -> {data}")
 
-        # If only one ticker, write it straight into the template's O column.
-        if len(ticker_list) == 1:
-            write_results(args.workbook, output, all_results[ticker_list[0]])
-        else:
-            print("\nMultiple tickers scraped - printed above. "
-                  "Tell me your preferred layout (one column per company?) "
-                  "and I'll wire up write_results() to match it.")
+            # Save a separate, cleanly named Excel file for each ticker
+            output = args.output if (args.output and len(ticker_list) == 1) else f"Risk_Report_{ticker}.xlsx"
+            write_results(args.workbook, output, data)
     finally:
         driver.quit()
 
