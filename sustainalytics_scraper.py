@@ -200,16 +200,22 @@ def search_company(driver, ticker):
     first_result = WebDriverWait(driver, WAIT_SECONDS).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "search-result.list-group-item"))
     )
+    time.sleep(1)
 
-    # Remove any Qualtrics survey popup overlays if present, then click via JS
+    # Remove any Qualtrics survey popups blocking the screen
     driver.execute_script(
-        "document.querySelectorAll('iframe[name*=\"survey\"], .QSISlider, .QSIWebResponsive').forEach(e => e.remove());"
-        "arguments[0].click();",
-        first_result,
+        "document.querySelectorAll('iframe[name*=survey], .QSISlider, .QSIWebResponsive, [class*=QSI]').forEach(e => e.remove());"
     )
+
+    # Try normal click first now that popups are gone; fall back to JS click on the element
+    try:
+        WebDriverWait(driver, 5).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "search-result.list-group-item"))
+        ).click()
+    except Exception:
+        driver.execute_script("arguments[0].click();", first_result)
+
     wait_url_contains(driver, "/overview")
-
-
 
 # ---------------------------------------------------------------------------
 # Scraping the /risk/overview page
