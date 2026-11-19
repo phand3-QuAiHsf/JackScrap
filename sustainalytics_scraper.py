@@ -522,6 +522,12 @@ def scrape_global_standards_and_controversy(driver):
 def scrape_company(driver, ticker):
     search_company(driver, ticker)
     open_risk_overview(driver)
+    try:
+        title_el = driver.find_element(By.CSS_SELECTOR, "h1, .company-name")
+        company_name = title_el.text.strip()
+        data["company_header"] = f"{company_name} ({ticker})" if company_name else ticker
+    except Exception:
+        data["company_header"] = ticker
 
     data = {}
     data.update(scrape_exposure_management(driver))
@@ -579,13 +585,14 @@ def _to_number(value):
         return None
 
 
-def write_results(workbook_path, output_path, data):
-    """Writes the raw scraped values into O7, O8, O10, O11, O12, O14, O15.
-    O7/O8/O10/O11/O12 are written as real numbers (needed for the N-column
-    scoring formulas to work). O14/O15 are left as text on purpose, since
-    they're statuses/categories (e.g. 'Compliant', 'Moderate'), not numbers."""
+def write_results(workbook_path, output_path, ticker, data):
+    """Writes the ticker into C3 (the merged green banner C3:O3) and the raw
+    scraped values into O7, O8, O10, O11, O12, O14, O15."""
     wb = openpyxl.load_workbook(workbook_path)
     ws = wb.worksheets[0]
+
+    # Put the company name/ticker into the merged C3:O3 header banner
+    ws["C3"] = data.get("company_header") or ticker
 
     ws["O7"] = _to_number(data.get("exposure_score"))
     ws["O8"] = _to_number(data.get("exposure_trend"))
@@ -597,7 +604,6 @@ def write_results(workbook_path, output_path, data):
 
     wb.save(output_path)
     print(f"Saved: {output_path}")
-
 
 # ---------------------------------------------------------------------------
 # Main
@@ -616,7 +622,6 @@ def main():
                          help="Fall back to logging in by hand (use this if MFA blocks auto-login)")
     args = parser.parse_args()
 
-    # Always prompt for ticker(s) if not passed via --ticker flag
     raw_input = args.ticker or input("\nEnter company ticker(s) separated by commas (e.g., NVDA or ASML,COHR): ")
     ticker_list = [t.strip().upper() for t in raw_input.split(",") if t.strip()]
 
@@ -636,15 +641,10 @@ def main():
             data = scrape_company(driver, ticker)
             print(f"{ticker} -> {data}")
 
-            # Save a separate, cleanly named Excel file for each ticker
             output = args.output if (args.output and len(ticker_list) == 1) else f"Risk_Report_{ticker}.xlsx"
-            write_results(args.workbook, output, data)
+            write_results(args.workbook, output, ticker, data)
     finally:
         driver.quit()
-
-
-if __name__ == "__main__":
-    main()
 
 # requirements.txt contents:
 # selenium
