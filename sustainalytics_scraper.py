@@ -522,7 +522,7 @@ def scrape_global_standards_and_controversy(driver):
 def scrape_company(driver, ticker):
     search_company(driver, ticker)
     open_risk_overview(driver)
-    try:
+        try:
         title_el = driver.find_element(By.CSS_SELECTOR, "h1, .company-name")
         company_name = title_el.text.strip()
         data["company_header"] = f"{company_name} ({ticker})" if company_name else ticker
