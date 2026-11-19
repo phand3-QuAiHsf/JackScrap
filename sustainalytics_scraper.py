@@ -522,19 +522,19 @@ def scrape_global_standards_and_controversy(driver):
 def scrape_company(driver, ticker):
     search_company(driver, ticker)
     open_risk_overview(driver)
-        try:
+
+    data = {}
+    try:
         title_el = driver.find_element(By.CSS_SELECTOR, "h1, .company-name")
         company_name = title_el.text.strip()
         data["company_header"] = f"{company_name} ({ticker})" if company_name else ticker
     except Exception:
         data["company_header"] = ticker
 
-    data = {}
     data.update(scrape_exposure_management(driver))
     data["management_gap"] = scrape_risk_decomposition(driver)
     data.update(scrape_global_standards_and_controversy(driver))
     return data
-
 
 # ---------------------------------------------------------------------------
 # Excel I/O
@@ -645,6 +645,9 @@ def main():
             write_results(args.workbook, output, ticker, data)
     finally:
         driver.quit()
+
+if __name__ == "__main__":
+    main()
 
 # requirements.txt contents:
 # selenium
